@@ -21,11 +21,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Route (API 연결)
 // const projectRoutes = require('./src/routes/projectRoutes');
 const packageRoutes = require('./src/routes/packageRoutes');
-// const commandRoutes = require('./src/routes/commandRoutes'); // 추후 구현
+const commandRoutes = require('./src/routes/commandRoutes');
 
 // app.use('/api/projects', projectRoutes);
 app.use('/api/packages', packageRoutes);
-// app.use('/api/commands', commandRoutes);
+app.use('/api/commands', commandRoutes);
 
 // TEST
 app.get('/', (req, res) => {
