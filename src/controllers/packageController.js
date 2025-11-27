@@ -4,7 +4,8 @@ const db = require('../config/db');
 const fileUtils = require('../utils/fileUtils');
 const path = require('path');
 const fs = require('fs-extra');
-const { v4: uuidv4 } = require('uuid'); // 임시파일명 중복 방지를 위해
+const uuid = require('uuid');
+const uuidv4 = uuid.v4;
 
 exports.createPackage = async (req, res) => {
     // 임시 작업 공간 경로 변수 (에러 발생 시 삭제를 위해 밖에서 선언)
@@ -33,7 +34,7 @@ exports.createPackage = async (req, res) => {
         console.log(`[Package Create] Project: ${project_id}, Version: ${version}`);
 
         // 2. 임시 작업 공간 생성 (충돌 방지를 위해 UUID 사용)
-        const uniqueId = uuidv4;
+        const uniqueId = uuidv4();
         tempWorkDir = path.join(__dirname, '../../uploads/temp', uniqueId);
         await fs.ensureDir(tempWorkDir);
 
@@ -59,7 +60,7 @@ exports.createPackage = async (req, res) => {
         await fs.ensureDir(finalDistDir);
 
         const zipFileName = `update_v${version}.zip`;
-        const finalZipPath = path.jsoin(finalDistDir, zipFileName);
+        const finalZipPath = path.join(finalDistDir, zipFileName);
 
         // 압축 수행
         await fileUtils.compressFolder(tempWorkDir, finalZipPath);
@@ -106,7 +107,7 @@ exports.createPackage = async (req, res) => {
         if (tempWorkDir) {
             await fileUtils.removeFolder(tempWorkDir);
             // multer가 남긴 raw 폴더 내의 파일들도 혹시 이동 안된게 있으면 정리 필요할 수 있음
-            
+
         }
     }
 }

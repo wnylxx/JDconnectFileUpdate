@@ -1,6 +1,6 @@
 // 파일 시스템 조작(폴더 생성, 이동), 압축(zip) 담당 (도구상자)
 const fs = require('fs-extra') // 기존 fs보다 강력한 파일 시스템 도구
-const archiver = require('archiever');
+const archiver = require('archiver');
 const path = require('path');
 
 /**
