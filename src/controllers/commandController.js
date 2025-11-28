@@ -48,7 +48,7 @@ exports.sendUpdateCommand = async (req, res) => {
             return res.status(400).json({ success: false, message: "업데이트할 대상 장비가 없습니다." });
         }
 
-        console.log(`[Command] Sending Update to ${finalDeviceList.length} devices. (Version: ${packageInfo})`);
+        console.log(`[Command] Sending Update to ${finalDeviceList.length} devices. (Version: ${packageInfo.version})`);
 
         // 4. 반복문: DB 로그 기록 및 MQTT 발행
         // (Promise.all을 사용하여 병렬 처리로 속도를 높입니다)
@@ -60,10 +60,18 @@ exports.sendUpdateCommand = async (req, res) => {
                 [devId]
             )
             if (devRows.length === 0) {
-                // TODO: console.log 찍기
+                console.log(`Device PK ${devId} not found in DB. Skipping`);
                 return;
             }
             const deviceDbId = devRows[0].id;
+
+            // 4-2. devices 테이블에서 deviec status를 'updating'으로 변경
+            // 디바이스의 관리 상태를 바꾸는 주체를 Server로 할지, Rpi에서 명령을 받았을 때 할지 중에 서버쪽 관리를 택함
+            // Rpi 관리 시 에러 발생 시 대응이 느림(무한루프)
+            await db.execute(
+                "UPDATE devices SET status = 'updating' WHERE id = ?",
+                [deviceDbId]
+            );
 
             // 4-2. Update_Logs 테이블에 'pending' 상태로 기록
             await db.execute(
