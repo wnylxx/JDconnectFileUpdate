@@ -28,6 +28,8 @@ exports.sendUpdateCommand = async (req, res) => {
         // 실제 운영 시에는 process.env.SERVER_HOST 등을 사용하세요.
         // 예: http://192.168.0.10:3000/uploads/...
         // 여기서는 DB에 저장된 값을 그대로 사용한다고 가정합니다.
+        // ************ 현재 DB에는 상대 주소로 되어있슴 -> uploads/prject/1/version.zip 형태
+        //                -> 그래서 Rpi에서 가져갈때, path.join 해서 사용하고 있는 중
 
         // 3. 대상 장비(Device) 리스트 확정
         let finalDeviceList = [];
@@ -76,7 +78,7 @@ exports.sendUpdateCommand = async (req, res) => {
             // 4-2. Update_Logs 테이블에 'pending' 상태로 기록
             await db.execute(
                 `INSERT INTO update_logs (device_pk, package_id, command_type, status, message)
-                VALUES (?, ?, 'update', 'pending', 'Command Sent')`,
+                VALUES (?, ?, 'update', 'pending', 'Update Command Sent')`,
                 [deviceDbId, package_id]
             );
 
@@ -118,7 +120,7 @@ exports.sendUpdateCommand = async (req, res) => {
 
 
 /**
- * 1. DB에 device_uuid 대신 device_id 로 했고, 데이터 타입은 Int 값이다.
+ * 1. DB에 device_uuid 대신 device_id 로 했고, 데이터 타입은 Int 값이다. => 데이터 타입 varchar로 변경했음
  * 2. 위 코드에서 device_uuid는 유니크값인데 왜 굳이 id를 따로 뽑아서 명령을 수행하는 건가? device_uuid로 명령 보내면 되는거 아닌가?
  * 3. const deviceDBId = devRows[0].id; 이부분에서 정상적인 상황에선 devRows.length 가 1이 되겠지? 근데 비정상적인 상황을 대비해서 devRows[0] 으로 써주는 거야?
  */
@@ -134,7 +136,93 @@ exports.sendUpdateCommand = async (req, res) => {
  * 3. JDConnect의 Device id 는 52001 과 같은 int 형태이지만, MQTT 토픽은 무조건 문자열을 받아야 하기 때문에 String으로 받아서 가는게 좋다.
  */
 
+exports.sendRollbackCommand = async (req, res) => {
+    try {
+        const { project_id, target_device_ids } = req.body;
+
+        // 1. 유효성 검사
+        if (!project_id || !target_device_ids) {
+            return res.status(400).json({ success: false, message: "필수 정보가 누락되어있습니다."})
+        }
+
+        // 2. 대상 장비 리스트 확정
+        let finalDeviceList = [];
+        if (target_device_ids.includes("ALL")) {
+            const [devices] = await db.execute(
+                'SELECT device_id FROM devices WHERE project_id = ?',
+                [project_id]
+            );
+            finalDeviceList = devices.map(d => d.device_id);
+        } else {
+            finalDeviceList = target_device_ids;
+        }
+
+        if (finalDeviceList.length === 0) {
+            return res.status(400).json({ success: false, message: "롤백할 대상 장비가 없습니다."});
+        }
+
+        console.log(`[Rollback] Sending Rollback to ${finalDeviceList.length} devices.`);
+
+        // 3. 반복문: 상태 변경 -> 로그 기록 -> MQTT 발행
+        const tasks = finalDeviceList.map(async (devId) => {
+            // 3-1. DB 조회
+            const [devRows] = await db.execute(
+                'SELECT id FROM devices WHERE device_id = ?',
+                [devId]
+            );
+
+            if (devRows.length === 0 ) {
+                console.log(`Device Code ${targetCode} not found in DB.`);
+                return;
+            }
+
+            const devicePK = devRows[0].id
+
+            // 3-2. 장비 상태를 'updating'으로 변경 (롤백도 업데이트의 일종)
+            await db.execute(
+                "UPDATE devices SET status = 'updating' WHERE id = ?",
+                [devicePK]
+            );
+
+            // 3-3. Update_Logs 테이블에 'Pending' 기록 (command_type = 'rollback')
+            // 롤백은 특정 package_id를 지정하기 어려우므로 NULL로 들어갈 수 있음
+            await db.execute(
+                `INSERT INTO update_logs (device_pk, command_type, status, message) 
+                 VALUES (?, 'rollback', 'pending', 'Rollback Command Sent')`,
+                 [devicePK]
+            );
+
+            // 3-4 MQTT 메시지 생성
+            const topic = `cmd/${project_id}/${devId}`;
+            const payload = JSON.stringify({
+                command: "ROLLBACK",
+                timestamp: now.Date().toISOString()
+            });
+
+            // 3-5. MQTT 발행
+            mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
+                if (err) console.error(`MQTT Publish Error (${devId}):`, err);
+                else console.log(`Rollback Sent to ${topic}`);
+            });
+        });
+
+        await Promise.all(tasks);
+
+        res.json({
+            success: true,
+            message: `${finalDeviceList.length}대의 장비에 롤백 명령을 전송했습니다.`,
+            data: { count: finalDeviceList.length }
+        });
+
+    } catch (error) {
+        console.err("Rollback Error", error);
+        res.status(500).json({ success: false, message: "서버 오류 발생", error: error.message});
+    }
+}
 
 
 
-// 지금 devices 에 있는 status에는 pending 표시가 안되네;
+/**
+ * updatelog에 status가 필요한가?
+ * devices의 status만 놔두면 되는거 아님?
+ */

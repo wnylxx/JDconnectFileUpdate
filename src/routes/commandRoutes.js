@@ -7,11 +7,7 @@ const commandController = require('../controllers/commandController');
 // Body: {project_id, package_id, target_device_ids: [] or ["ALL"]}
 
 router.post('/update', commandController.sendUpdateCommand);
-
-// TODO: 롤백 기능
-
-
-
+router.post('/rollback', commandController.sendRollbackCommand);
 
 
 module.exports = router;
