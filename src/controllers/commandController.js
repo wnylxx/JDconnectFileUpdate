@@ -196,7 +196,7 @@ exports.sendRollbackCommand = async (req, res) => {
             const topic = `cmd/${project_id}/${devId}`;
             const payload = JSON.stringify({
                 command: "ROLLBACK",
-                timestamp: now.Date().toISOString()
+                timestamp: new Date().toISOString()
             });
 
             // 3-5. MQTT 발행
@@ -215,7 +215,7 @@ exports.sendRollbackCommand = async (req, res) => {
         });
 
     } catch (error) {
-        console.err("Rollback Error", error);
+        console.error("Rollback Error", error);
         res.status(500).json({ success: false, message: "서버 오류 발생", error: error.message});
     }
 }
