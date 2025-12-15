@@ -14,7 +14,6 @@ client.on('connect', () => {
 });
 
 client.on('message', async (topic, message) => {
-    // --TODO: 메시지 처리 로직(DB 업데이트 등) 구현
     try {
         const msgString = message.toString();
         // topic: status(or log)/projectId/deviceId
