@@ -2,6 +2,8 @@
 const db = require('../config/db');
 const mqttClient = require('../config/mqtt');
 
+const deployService = require('../services/deployService');
+
 exports.sendUpdateCommand = async (req, res) => {
     try {
         const { project_id, package_id, target_device_ids } = req.body;
@@ -21,7 +23,18 @@ exports.sendUpdateCommand = async (req, res) => {
             return res.status(404).json({ success: false, message: "존재하지 않는 패키지입니다." });
         }
 
-        const packageInfo = packages[0]; 
+        const { version, file_path } = packages[0];
+
+        // 3. 공통 서비스 호출! (로직 재사용)
+        const count = await deployService.deployPackageToDevices(
+            project_id, 
+            package_id, 
+            version, 
+            file_path, 
+            target_device_ids
+        );
+
+        // const packageInfo = packages[0]; 
 
         // 다운로드 URL이 상대 경로라면 전체 URL로 만들어주는 것이 좋습니다.
         // (환경변수나 설정을 통해 호스트 주소를 붙여줍니다. 여기서는 예시로 로컬호스트 사용)
@@ -32,83 +45,89 @@ exports.sendUpdateCommand = async (req, res) => {
         //                -> 그래서 Rpi에서 가져갈때, path.join 해서 사용하고 있는 중
 
         // 3. 대상 장비(Device) 리스트 확정
-        let finalDeviceList = [];
+        // let finalDeviceList = [];
 
-        if (target_device_ids.includes("ALL")) {
-            // "전체 선택"인 경우, DB에서 해당 프로젝트의 모든 장비를 조회
-            const [devices] = await db.execute(
-                'SELECT device_id FROM devices WHERE project_id = ?',
-                [project_id]
-            );
-            finalDeviceList = devices.map(d => d.device_id);
-        } else {
-            // "개별 선택"인 경우, 요청받은 리스트 그대로 사용
-            finalDeviceList = target_device_ids;
-        }
+        // if (target_device_ids.includes("ALL")) {
+        //     // "전체 선택"인 경우, DB에서 해당 프로젝트의 모든 장비를 조회
+        //     const [devices] = await db.execute(
+        //         'SELECT device_id FROM devices WHERE project_id = ?',
+        //         [project_id]
+        //     );
+        //     finalDeviceList = devices.map(d => d.device_id);
+        // } else {
+        //     // "개별 선택"인 경우, 요청받은 리스트 그대로 사용
+        //     finalDeviceList = target_device_ids;
+        // }
 
-        if (finalDeviceList.length === 0) {
-            return res.status(400).json({ success: false, message: "업데이트할 대상 장비가 없습니다." });
-        }
+        // if (finalDeviceList.length === 0) {
+        //     return res.status(400).json({ success: false, message: "업데이트할 대상 장비가 없습니다." });
+        // }
 
-        console.log(`[Command] Sending Update to ${finalDeviceList.length} devices. (Version: ${packageInfo.version})`);
+        // console.log(`[Command] Sending Update to ${finalDeviceList.length} devices. (Version: ${packageInfo.version})`);
 
-        // 4. 반복문: DB 로그 기록 및 MQTT 발행
-        // (Promise.all을 사용하여 병렬 처리로 속도를 높입니다)
-        const tasks = finalDeviceList.map(async (devId) => {
-            // 4-1. DB 조회: device_uuid로 device table의 id(PK)를 알아내야 로그에 남길 수 있음
-            // (최적화를 위해선 위에서 가져올 때 id도 같이 가져오는게 좋지만, 로직 분리를 위해 여기서 처리)
-            const [devRows] = await db.execute(
-                'SELECT id FROM devices WHERE device_id = ?',
-                [devId]
-            )
-            if (devRows.length === 0) {
-                console.log(`Device PK ${devId} not found in DB. Skipping`);
-                return;
-            }
-            const deviceDbId = devRows[0].id;
+        // // 4. 반복문: DB 로그 기록 및 MQTT 발행
+        // // (Promise.all을 사용하여 병렬 처리로 속도를 높입니다)
+        // const tasks = finalDeviceList.map(async (devId) => {
+        //     // 4-1. DB 조회: device_uuid로 device table의 id(PK)를 알아내야 로그에 남길 수 있음
+        //     // (최적화를 위해선 위에서 가져올 때 id도 같이 가져오는게 좋지만, 로직 분리를 위해 여기서 처리)
+        //     const [devRows] = await db.execute(
+        //         'SELECT id FROM devices WHERE device_id = ?',
+        //         [devId]
+        //     )
+        //     if (devRows.length === 0) {
+        //         console.log(`Device PK ${devId} not found in DB. Skipping`);
+        //         return;
+        //     }
+        //     const deviceDbId = devRows[0].id;
 
-            // 4-2. devices 테이블에서 deviec status를 'updating'으로 변경
-            // 디바이스의 관리 상태를 바꾸는 주체를 Server로 할지, Rpi에서 명령을 받았을 때 할지 중에 서버쪽 관리를 택함
-            // Rpi 관리 시 에러 발생 시 대응이 느림(무한루프)
-            await db.execute(
-                "UPDATE devices SET status = 'updating' WHERE id = ?",
-                [deviceDbId]
-            );
+        //     // 4-2. devices 테이블에서 deviec status를 'updating'으로 변경
+        //     // 디바이스의 관리 상태를 바꾸는 주체를 Server로 할지, Rpi에서 명령을 받았을 때 할지 중에 서버쪽 관리를 택함
+        //     // Rpi 관리 시 에러 발생 시 대응이 느림(무한루프)
+        //     await db.execute(
+        //         "UPDATE devices SET status = 'updating' WHERE id = ?",
+        //         [deviceDbId]
+        //     );
 
-            // 4-2. Update_Logs 테이블에 'pending' 상태로 기록
-            await db.execute(
-                `INSERT INTO update_logs (device_pk, package_id, command_type, status, message)
-                VALUES (?, ?, 'update', 'pending', 'Update Command Sent')`,
-                [deviceDbId, package_id]
-            );
+        //     // 4-2. Update_Logs 테이블에 'pending' 상태로 기록
+        //     await db.execute(
+        //         `INSERT INTO update_logs (device_pk, package_id, command_type, status, message)
+        //         VALUES (?, ?, 'update', 'pending', 'Update Command Sent')`,
+        //         [deviceDbId, package_id]
+        //     );
 
-            // 4-3. MQTT 메시지 생성
-            const topic = `cmd/${project_id}/${devId}`;
-            const payload = JSON.stringify({
-                command: "UPDATE",
-                version: packageInfo.version,
-                download_url: packageInfo.file_path, // TODO: 현재 상대 좌표임 추후 절대 좌표로 바꿔야함
-                package_id: package_id,
-                timestamp: new Date().toISOString()
-            });
+        //     // 4-3. MQTT 메시지 생성
+        //     const topic = `cmd/${project_id}/${devId}`;
+        //     const payload = JSON.stringify({
+        //         command: "UPDATE",
+        //         version: packageInfo.version,
+        //         download_url: packageInfo.file_path, // TODO: 현재 상대 좌표임 추후 절대 좌표로 바꿔야함
+        //         package_id: package_id,
+        //         timestamp: new Date().toISOString()
+        //     });
 
-            // 4-4 MQTT 발생 (QoS 1: 적어도 1회 전달 보장)
-            mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
-                if (err) console.error(`MQTT Publish Error (${devId} : )`, err);
-                else console.log(`Sent to ${topic}`);
-            });
-        });
+        //     // 4-4 MQTT 발생 (QoS 1: 적어도 1회 전달 보장)
+        //     mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
+        //         if (err) console.error(`MQTT Publish Error (${devId} : )`, err);
+        //         else console.log(`Sent to ${topic}`);
+        //     });
+        // });
 
-        await Promise.all(tasks);
+        // await Promise.all(tasks);
 
         // 5. 최종 응답
+        // res.json({
+        //     success: true,
+        //     message: `${finalDeviceList.length}대의 장비에 업데이트 명령을 전송했습니다.`,
+        //     data: {
+        //         target_count: finalDeviceList.length,
+        //         version: packageInfo.version
+        //     }
+        // });
+
         res.json({
             success: true,
-            message: `${finalDeviceList.length}대의 장비에 업데이트 명령을 전송했습니다.`,
-            data: {
-                target_count: finalDeviceList.length,
-                version: packageInfo.version
-            }
+            message: `${count}대 장비에 업데이트 명령 재전송 완료`,
+            data: { count } // 이전 코드에서는 version 도 받았는데
         });
 
     } catch (error) {

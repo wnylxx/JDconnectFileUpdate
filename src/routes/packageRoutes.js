@@ -27,6 +27,6 @@ const upload = multer({ storage: storage });
 // 2. 라우트 정의
 // POST /api/packages
 // files: 다중 파일, map_data: JSON 문자열, project_id, version
-router.post('/', upload.array('files'), packageController.createPackage);
+router.post('/', upload.array('files'), packageController.createPackageAndDeploy);
 
 module.exports = router;
