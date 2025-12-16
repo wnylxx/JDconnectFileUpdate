@@ -63,7 +63,25 @@ client.on('message', async (topic, message) => {
                 console.log(`Device [${deviceId}] status updated to: ${payload.status} (v${payload.current_version})`);
             }
         } else if (type === 'log') {
-            // TODO: 로그 처리 (step 4 예정)
+            // payload: { device_id, status: 'success'/'fail', message, package_id }
+            console.log(`📝 Log from [${deviceId}]: ${payload.status} - ${payload.message}`);
+            
+            // DB에 로그 '추가' (History 보존을 위해 INSERT 권장)
+            // device_code(deviceId)로 device_pk(id)를 찾아야 함
+            const [devRows] = await db.execute('SELECT id FROM devices WHERE device_id = ?', [deviceId]);
+            
+            if (devRows.length > 0) {
+                const devicePk = devRows[0].id;
+                
+                // package_id가 없는 경우(일반 로그)를 대비해 null 처리
+                const pkgId = payload.package_id || null;
+
+                await db.execute(
+                    `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, created_at)
+                     VALUES (?, ?, 'log_report', ?, ?, NOW())`,
+                    [devicePk, pkgId, payload.status, payload.message]
+                );
+            }
         }
 
     } catch (error) {
