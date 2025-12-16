@@ -8,6 +8,8 @@ const uuid = require('uuid');
 const { default: mqtt, MqttClient } = require('mqtt');
 const uuidv4 = uuid.v4;
 
+const deployService = require('../service/deployService');
+
 
 // 서버에 파일 업로드 및 배포 (one shot)
 exports.createPackageAndDeploy = async (req, res) => {
@@ -37,6 +39,7 @@ exports.createPackageAndDeploy = async (req, res) => {
 
         // target_device_ids 파싱 (JSON 문자열로 올 경우 대비)
         let targetDevices = [];
+
         if (target_device_ids) {
             try {
                 targetDevices = typeof target_device_ids === 'string' ? JSON.parse(target_device_ids) : target_device_ids;
@@ -77,49 +80,23 @@ exports.createPackageAndDeploy = async (req, res) => {
              [project_id, version, downloadUrl, 'One-Shot Upload']
         );
 
-        const newPackageId = result.insertId; // 이부분 insertId 뭐지
+        const newPackageId = result.insertId; // 방금 넣은 행의 id 값을 받아오는 메서드
         
         // --- [추가된 부분: 즉시 배포 로직] ---
         let deployCount = 0;
 
+
+
         if ( targetDevices.length > 0 ) {
             console.log(`[PKCTL] Deploying Package ID ${newPackageId} to ${targetDevices.length} devices...`);
 
-            // ALL 처리
-            if (targetDevices.includes("ALL")) {
-                const [allDevs] = await db.execute('SELECT device_id FROM devices WHERE project_id = ?', [project_id]);
-                targetDevices = allDevs.map(d => d.device_id);
-            }
-
-            const deployTasks = targetDevices.map(async (deviceId) => {
-                // 1. Device Id 조회
-                const [devRows] = await db.execute('SELECT id FROM devices WHERE device_id = ?', [deviceId]);
-                if (devRows.length === 0) return;
-                const devicePk = devRows[0].id;
-
-                // 2. DB 상태 업데이트 (Updating) & 로그 기록 (Pending)
-                await db.execute("UPDATE devices SET status = 'updating' WHERE id = ?", [devicePk]);
-                await db.execute(
-                    `INSERT INTO update_logs (device_pk, package_id, command_type, status, message)
-                     VALUE (?, ?, 'update', 'pending', 'Command Sent')`,
-                     [devicePk, newPackageId]
-                );
-
-                // 3. MQTT 전송
-                const topic = `cmd/${project_id}/${deviceId}`;
-                const payload = JSON.stringify({
-                    command: "UPDATE",
-                    version: version,
-                    download_url: downloadUrl,
-                    package_id: newPackageId,
-                    timestamp: new Date().toISOString()
-                });
-
-                MqttClient.publish(topic, payload, {qos: 1});
-            });
-
-            await Promise.all(deployTasks);
-            deployCount = targetDevices.length;
+            deployCount = await deployService.deployPackageToDevices(
+                project_id, 
+                newPackageId, 
+                version, 
+                downloadUrl, 
+                targetDevices
+            );
         }
 
         // 응답
