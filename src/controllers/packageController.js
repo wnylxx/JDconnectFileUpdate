@@ -8,7 +8,7 @@ const uuid = require('uuid');
 const { default: mqtt, MqttClient } = require('mqtt');
 const uuidv4 = uuid.v4;
 
-const deployService = require('../service/deployService');
+const deployService = require('../services/deployService');
 
 
 // 서버에 파일 업로드 및 배포 (one shot)

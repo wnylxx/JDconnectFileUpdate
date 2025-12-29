@@ -10,6 +10,10 @@
  * @param {Array} targetDeviceIds - 대상 장비 device_id 목록 (문자열 배열)
  */
 
+const db = require('../config/db'); 
+const mqttClient = require('../config/mqtt');
+
+
 exports.deployPackageToDevices = async(projectId, packageId, version, downloadUrl, targetDeviceIds) => {
     let deployedCount = 0;
 
@@ -39,8 +43,8 @@ exports.deployPackageToDevices = async(projectId, packageId, version, downloadUr
 
             // 2-3. 로그 기록 (Pending)
             await db.execute(
-                `INSERT INTO update_logs (device_pk, package_id, command_type, status, message) 
-                 VALUES (?, ?, 'update', 'pending', 'Command Sent')`,
+                `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, started_at) 
+                 VALUES (?, ?, 'update', 'pending', 'Command Sent', NOW())`,
                 [devicePk, packageId]
             );
 

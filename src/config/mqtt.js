@@ -77,7 +77,8 @@ client.on('message', async (topic, message) => {
                 const pkgId = payload.package_id || null;
 
                 await db.execute(
-                    `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, created_at)
+                    // [수정] created_at -> started_at
+                    `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, started_at)
                      VALUES (?, ?, 'log_report', ?, ?, NOW())`,
                     [devicePk, pkgId, payload.status, payload.message]
                 );
