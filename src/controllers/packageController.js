@@ -28,6 +28,14 @@ exports.createPackageAndDeploy = async (req, res) => {
         if (!map_data) {
             return res.status(400).json({ success: false, message: "파일 매핑 정보(map_data)가 없습니다." });
         }
+
+        if (exists.length > 0) {
+            // 이미 존재하면 즉시 에러 리턴 (파일 작업 안 함)
+            return res.status(409).json({ 
+                success: false, 
+                message: `버전 v${version}은(는) 이미 존재합니다. 버전을 올려주세요.` 
+            });
+        }
         
         // map_data 파싱 (JSON 문자열 -> 객체 배열)
         let mapping;
