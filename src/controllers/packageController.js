@@ -29,6 +29,11 @@ exports.createPackageAndDeploy = async (req, res) => {
             return res.status(400).json({ success: false, message: "파일 매핑 정보(map_data)가 없습니다." });
         }
 
+        const [exists] = await db.execute(
+            'SELECT 1 FROM packages WHERE project_id = ? AND version = ?',
+            [project_id, version]
+        );
+        
         if (exists.length > 0) {
             // 이미 존재하면 즉시 에러 리턴 (파일 작업 안 함)
             return res.status(409).json({ 
@@ -92,8 +97,6 @@ exports.createPackageAndDeploy = async (req, res) => {
         
         // --- [추가된 부분: 즉시 배포 로직] ---
         let deployCount = 0;
-
-
 
         if ( targetDevices.length > 0 ) {
             console.log(`[PKCTL] Deploying Package ID ${newPackageId} to ${targetDevices.length} devices...`);
