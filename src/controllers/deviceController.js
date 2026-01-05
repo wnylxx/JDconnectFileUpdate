@@ -13,7 +13,7 @@ exports.getProjectDevices = async (req, res) => {
                 d.id, d.device_id, d.name, d.status, d.current_version, d.last_ip, d.last_connected_at,
                 l.status AS last_log_status,
                 l.message AS last_log_message,
-                l.started_at AS last_log_time,  -- [수정] created_at -> started_at
+                l.started_at AS last_log_time,  
                 p.version AS target_version
             FROM devices d
             LEFT JOIN update_logs l 
