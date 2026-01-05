@@ -23,12 +23,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const packageRoutes = require('./src/routes/packageRoutes');
 const commandRoutes = require('./src/routes/commandRoutes');
 const deviceRoutes = require('./src/routes/deviceRoutes');
-
+const projectRoutes = require('./src/routes/projectRoutes');
 
 // app.use('/api/projects', projectRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/commands', commandRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/projects', projectRoutes);
 
 // TEST
 app.get('/', (req, res) => {
