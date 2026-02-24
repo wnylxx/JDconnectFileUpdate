@@ -48,13 +48,6 @@ exports.sendUpdateCommand = async (req, res) => {
 };
 
 
-
-/**
- * 1. DB에 device_uuid 대신 device_id 로 했고, 데이터 타입은 Int 값이다. => 데이터 타입 varchar로 변경했음
- * 2. 위 코드에서 device_uuid는 유니크값인데 왜 굳이 id를 따로 뽑아서 명령을 수행하는 건가? device_uuid로 명령 보내면 되는거 아닌가?
- * 3. const deviceDBId = devRows[0].id; 이부분에서 정상적인 상황에선 devRows.length 가 1이 되겠지? 근데 비정상적인 상황을 대비해서 devRows[0] 으로 써주는 거야?
- */
-
 /**
  * 1. device_id(식별자)가 있지만 id(PK)를 찾아서 쓰는 이유 - DB 성능과 데이터 무결성(참조 관계) 때문
  *  - PK로 검색하는게 속도가 가장 빠르고, update_logs 테이블에 device_id 컬럼을 FK로 devices의 id(PK)를 설정했기 때문

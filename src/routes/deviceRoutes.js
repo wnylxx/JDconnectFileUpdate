@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const dveiceController = require('../controllers/deviceController');
+const deviceController = require('../controllers/deviceController');
 
-router.get('/:projectId', dveiceController.getProjectDevices);
+
+router.post('/check-in', deviceController.checkInDevice);
+router.get('/:projectId', deviceController.getProjectDevices);
 
 module.exports = router;
