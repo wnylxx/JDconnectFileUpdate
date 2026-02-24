@@ -5,7 +5,7 @@ exports.getAllProjects = async (req, res) => {
     try {
         // id와 name 만 가져옴
         const query = 'SELECT id, name FROM projects ORDER BY id ASC';
-        const [row] = await db.execute(query);
+        const [rows] = await db.execute(query);
 
         res.json({success: true, list: rows});
     } catch (error) {

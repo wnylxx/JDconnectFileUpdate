@@ -6,27 +6,17 @@ exports.getProjectDevices = async (req, res) => {
     try {
         const { projectId } = req.params;
 
-        // ★ 핵심 쿼리: Devices 테이블 + 최신 Update_Logs (LEFT JOIN)
-        // 서브쿼리를 사용하여 각 장비별 가장 최신(MAX id) 로그 하나만 가져옵니다.
         const query = `
-            SELECT 
-                d.id, d.device_id, d.name, d.status, d.current_version, d.last_ip, d.last_connected_at,
-                l.status AS last_log_status,
-                l.message AS last_log_message,
-                l.started_at AS last_log_time,  
-                p.version AS target_version
-            FROM devices d
-            LEFT JOIN update_logs l 
-                ON d.id = l.device_pk 
-                AND l.id = (
-                    SELECT MAX(id) 
-                    FROM update_logs 
-                    WHERE device_pk = d.id
-                )
-            LEFT JOIN packages p 
-                ON l.package_id = p.id
-            WHERE d.project_id = ?
-            ORDER BY d.device_id ASC
+            SELECT
+                id,
+                project_id,
+                name,
+                current_version,
+                status,
+                last_connected_at
+            FROM devices
+            WHERE project_id = ?
+            ORDER BY id ASC
         `;
 
         const [rows] = await db.execute(query, [projectId]);
