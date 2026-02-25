@@ -32,11 +32,18 @@ client.on('message', async (topic, message) => {
                 await db.execute(
                     `UPDATE devices 
                      SET current_version = ?, 
+                         backup_version = ?, /* ★ backup_version 추가 */
                          status = ?, 
                          name = ?, 
                          last_connected_at = NOW() 
-                     WHERE id = ?`, // device_id 대신 id 사용
-                    [payload.current_version, payload.status, payload.name, devicePkId]
+                     WHERE id = ?`,
+                    [
+                        payload.current_version, 
+                        payload.backup_version, /* ★ payload에서 추출 */
+                        payload.status, 
+                        payload.name, 
+                        devicePkId
+                    ]
                 );
             } else {
                 // disconnect 등 연결이 끊겼을 때는 버전과 이름은 놔두고 상태와 시간만 갱신
@@ -44,7 +51,7 @@ client.on('message', async (topic, message) => {
                     `UPDATE devices 
                      SET status = ?, 
                          last_connected_at = NOW() 
-                     WHERE id = ?`, // device_id 대신 id 사용
+                     WHERE id = ?`,
                     [payload.status, devicePkId]
                 );
             }
