@@ -32,14 +32,14 @@ client.on('message', async (topic, message) => {
                 await db.execute(
                     `UPDATE devices 
                      SET current_version = ?, 
-                         backup_version = ?, /* ★ backup_version 추가 */
+                         backup_version = ?,
                          status = ?, 
                          name = ?, 
                          last_connected_at = NOW() 
                      WHERE id = ?`,
                     [
                         payload.current_version, 
-                        payload.backup_version, /* ★ payload에서 추출 */
+                        payload.backup_version,
                         payload.status, 
                         payload.name, 
                         devicePkId

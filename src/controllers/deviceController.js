@@ -12,6 +12,7 @@ exports.getProjectDevices = async (req, res) => {
                 project_id,
                 name,
                 current_version,
+                backup_version,
                 status,
                 last_connected_at
             FROM devices
