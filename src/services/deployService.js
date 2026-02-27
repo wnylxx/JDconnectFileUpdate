@@ -20,8 +20,8 @@ exports.deployPackageToDevices = async(projectId, packageId, version, downloadUr
     // 1. "ALL" 처리
     let finalTargetList = [];
     if (targetDeviceIds.includes("ALL")) {
-        const [devices] = await db.execute('SELECT device_id FROM devices WHERE project_id = ?', [projectId]);
-        finalTargetList = devices.map(d => d.device_id);
+        const [devices] = await db.execute('SELECT id FROM devices WHERE project_id = ?', [projectId]);
+        finalTargetList = devices.map(d => d.id);
     } else {
         finalTargetList = targetDeviceIds;
     }
@@ -31,25 +31,22 @@ exports.deployPackageToDevices = async(projectId, packageId, version, downloadUr
     console.log(`Deploy Service: Sending v${version} to ${finalTargetList.length} devices.`);
 
     // 2. 병렬 처리로 배포 수행
-    const tasks = finalTargetList.map(async (devId) => {
+    const tasks = finalTargetList.map(async (devicePkId) => {
         try {
-            // 2-1. DB PK 조회 (update_logs에는 PK가 필요하므로)
-            const [devRows] = await db.execute('SELECT id FROM devices WHERE device_id = ?', [devId]);
-            if (devRows.length === 0) return;
-            const devicePk = devRows[0].id;
-
+            // 2-1. DB PK 조회 (update_logs에는 PK가 필요하므로) =>  삭제 (PK 찾을 필요 없어짐)
+  
             // 2-2. 상태 변경 (Updating)
-            await db.execute("UPDATE devices SET status = 'updating' WHERE id = ?", [devicePk]);
+            await db.execute("UPDATE devices SET status = 'updating' WHERE id = ?", [devicePkId]);
 
-            // 2-3. 로그 기록 (Pending)
-            await db.execute(
-                `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, started_at) 
-                 VALUES (?, ?, 'update', 'pending', 'Command Sent', NOW())`,
-                [devicePk, packageId]
-            );
+            // 2-3. 로그 기록 (Pending) -- 로그 기록 방식 바뀜
+            // await db.execute(
+            //     `INSERT INTO update_logs (device_pk, package_id, command_type, status, message, started_at) 
+            //      VALUES (?, ?, 'update', 'pending', 'Command Sent', NOW())`,
+            //     [devicePk, packageId]
+            // );
 
             // 2-4. MQTT 전송
-            const topic = `cmd/${projectId}/${devId}`;
+            const topic = `cmd/${projectId}/${devicePkId}`;
             const payload = JSON.stringify({
                 command: "UPDATE",
                 version: version,
@@ -62,7 +59,7 @@ exports.deployPackageToDevices = async(projectId, packageId, version, downloadUr
             deployedCount++;
 
         } catch (err) {
-            console.error(`Deploy Error for ${devId}:`, err.message);
+            console.error(`Deploy Error for ${devicePkId}:`, err.message);
         }
     });
 

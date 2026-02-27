@@ -72,10 +72,10 @@ exports.sendRollbackCommand = async (req, res) => {
         let finalDeviceList = [];
         if (target_device_ids.includes("ALL")) {
             const [devices] = await db.execute(
-                'SELECT device_id FROM devices WHERE project_id = ?',
+                'SELECT id FROM devices WHERE project_id = ?',
                 [project_id]
             );
-            finalDeviceList = devices.map(d => d.device_id);
+            finalDeviceList = devices.map(d => d.id);
         } else {
             finalDeviceList = target_device_ids;
         }
@@ -87,36 +87,25 @@ exports.sendRollbackCommand = async (req, res) => {
         console.log(`[Rollback] Sending Rollback to ${finalDeviceList.length} devices.`);
 
         // 3. 반복문: 상태 변경 -> 로그 기록 -> MQTT 발행
-        const tasks = finalDeviceList.map(async (devId) => {
+        const tasks = finalDeviceList.map(async (devicePkId) => {
             // 3-1. DB 조회
-            const [devRows] = await db.execute(
-                'SELECT id FROM devices WHERE device_id = ?',
-                [devId]
-            );
-
-            if (devRows.length === 0 ) {
-                console.log(`Device Code ${targetCode} not found in DB.`);
-                return;
-            }
-
-            const devicePK = devRows[0].id
 
             // 3-2. 장비 상태를 'updating'으로 변경 (롤백도 업데이트의 일종)
             await db.execute(
                 "UPDATE devices SET status = 'updating' WHERE id = ?",
-                [devicePK]
+                [devicePkId]
             );
 
             // 3-3. Update_Logs 테이블에 'Pending' 기록 (command_type = 'rollback')
             // 롤백은 특정 package_id를 지정하기 어려우므로 NULL로 들어갈 수 있음
-            await db.execute(
-                `INSERT INTO update_logs (device_pk, command_type, status, message) 
-                 VALUES (?, 'rollback', 'pending', 'Rollback Command Sent')`,
-                 [devicePK]
-            );
+            // await db.execute(
+            //     `INSERT INTO update_logs (device_pk, command_type, status, message) 
+            //      VALUES (?, 'rollback', 'pending', 'Rollback Command Sent')`,
+            //      [devicePK]
+            // );
 
             // 3-4 MQTT 메시지 생성
-            const topic = `cmd/${project_id}/${devId}`;
+            const topic = `cmd/${project_id}/${devicePkId}`;
             const payload = JSON.stringify({
                 command: "ROLLBACK",
                 timestamp: new Date().toISOString()
@@ -124,7 +113,7 @@ exports.sendRollbackCommand = async (req, res) => {
 
             // 3-5. MQTT 발행
             mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
-                if (err) console.error(`MQTT Publish Error (${devId}):`, err);
+                if (err) console.error(`MQTT Publish Error (${devicePkId}):`, err);
                 else console.log(`Rollback Sent to ${topic}`);
             });
         });
